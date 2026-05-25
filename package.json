@@ -1,0 +1,18 @@
+{
+  "name": "slangmath-site",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^3.0.0",
+    "svelte": "^4.0.0",
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "slangmath": "^1.1.0"
+  },
+  "type": "module"
+}
