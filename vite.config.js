@@ -9,10 +9,9 @@ export default defineConfig({
     'process.argv': '["", ""]'
   },
   resolve: {
-    alias: {
-      slangmath: resolve('src/lib/slangmath-demo.js'),
-      '$slangpkg': resolve('node_modules/slangmath')
-    }
+    alias: [
+      { find: /^slangmath$/, replacement: resolve('src/lib/slangmath-demo.js') }
+    ]
   },
   cacheDir: '/tmp/vite-cache'
 });

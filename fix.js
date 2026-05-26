@@ -1,10 +1,32 @@
 #!/usr/bin/env node
 // fix-slangmath.js  — run once from project root: node fix-slangmath.js
-import { readFileSync, writeFileSync, readdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync, copyFileSync } from "fs";
 import { join } from "path";
 
 const dir = "./node_modules/slangmath";
 let patched = 0;
+
+const npmPackageFileMap = {
+  "slang-basic.js": "src/core/basic.js",
+  "slang-convertor.js": "src/convertor.js",
+  "slang-extended.js": "src/extended.js",
+  "slang-linalg.js": "src/math/linalg.js",
+  "slang-ode.js": "src/math/ode.js",
+  "slang-symbolic.js": "src/symbolic.js"
+};
+
+function materializeExportFiles() {
+  for (const [target, source] of Object.entries(npmPackageFileMap)) {
+    const targetPath = join(dir, target);
+    const sourcePath = join(dir, source);
+
+    if (!existsSync(targetPath) && existsSync(sourcePath)) {
+      copyFileSync(sourcePath, targetPath);
+      patched++;
+      console.log(`  + Added missing npm export: ${target}`);
+    }
+  }
+}
 
 function fixFile(name) {
   const path = join(dir, name);
@@ -118,6 +140,7 @@ function fixDuplicateErf() {
 
 console.log("\n🔧 Patching slangmath...\n");
 try {
+  materializeExportFiles();
   const files = readdirSync(dir).filter((f) => f.endsWith(".js"));
   for (const f of files) fixFile(f);
   fixDuplicateErf();
