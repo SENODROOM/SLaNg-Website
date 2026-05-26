@@ -320,12 +320,12 @@
       {#if activeTab === 'symbolic'}
         <div class="inputs">
           <div class="field wide">
-            <label>Expression</label>
+            <span class="field-label">Expression</span>
             <input bind:value={symbolicExpr} on:input={run} placeholder="sin(x^2) + x^3 / 3" />
             <span class="hint">Supports +, -, *, /, ^, parentheses, trig, exp, ln, sqrt, abs</span>
           </div>
           <div class="field">
-            <label>Operation</label>
+            <span class="field-label">Operation</span>
             <select bind:value={symbolicMode} on:change={run}>
               <option value="differentiate">Differentiate</option>
               <option value="integrate">Integrate</option>
@@ -333,11 +333,11 @@
             </select>
           </div>
           <div class="field">
-            <label>Variable</label>
+            <span class="field-label">Variable</span>
             <input bind:value={symbolicVar} on:input={run} maxlength="1" />
           </div>
           <div class="field">
-            <label>Evaluate at {symbolicVar} =</label>
+            <span class="field-label">Evaluate at {symbolicVar} =</span>
             <input type="number" step="0.01" bind:value={symbolicEval} on:input={run} />
           </div>
         </div>
@@ -353,16 +353,16 @@ symToLatex(result);</code></pre>
       {#if activeTab === 'polynomial'}
         <div class="inputs">
           <div class="field">
-            <label>Coefficients (highest→lowest degree)</label>
+            <span class="field-label">Coefficients (highest→lowest degree)</span>
             <input bind:value={polyCoeffs} on:input={run} placeholder="e.g. 1,-3,2" />
             <span class="hint">Creates x²−3x+2</span>
           </div>
           <div class="field">
-            <label>Variable</label>
+            <span class="field-label">Variable</span>
             <input bind:value={polyVar} on:input={run} maxlength="1" />
           </div>
           <div class="field">
-            <label>Evaluate at {polyVar} =</label>
+            <span class="field-label">Evaluate at {polyVar} =</span>
             <input type="number" bind:value={evalX} on:input={run} />
           </div>
         </div>
@@ -378,17 +378,17 @@ slangToLatex(diff);</code></pre>
       {#if activeTab === 'fraction'}
         <div class="inputs">
           <div class="field">
-            <label>Numerator coefficients</label>
+            <span class="field-label">Numerator coefficients</span>
             <input bind:value={fracNumi} on:input={run} placeholder="1,0,-1" />
             <span class="hint">e.g. 1,0,-1 → x²−1</span>
           </div>
           <div class="field">
-            <label>Denominator coefficients</label>
+            <span class="field-label">Denominator coefficients</span>
             <input bind:value={fracDeno} on:input={run} placeholder="1,-1" />
             <span class="hint">e.g. 1,-1 → x−1</span>
           </div>
           <div class="field">
-            <label>Evaluate at x =</label>
+            <span class="field-label">Evaluate at x =</span>
             <input type="number" bind:value={fracEvalX} on:input={run} />
           </div>
         </div>
@@ -403,8 +403,8 @@ slangToLatex(frac); // → LaTeX string</code></pre>
       {#if activeTab === 'latex'}
         <div class="inputs">
           <div class="field wide">
-            <label>LaTeX Expression</label>
-            <input bind:value={latexInput} on:input={run} placeholder="\frac{x^2-1}{x+1}" />
+            <span class="field-label">LaTeX Expression</span>
+            <input bind:value={latexInput} on:input={run} placeholder="\\frac&#123;x^2-1&#125;&#123;x+1&#125;" />
             <span class="hint">Enter any LaTeX math expression</span>
           </div>
         </div>
@@ -419,11 +419,11 @@ slangToLatex(slangObj); // roundtrip</code></pre>
       {#if activeTab === 'calculus'}
         <div class="inputs">
           <div class="field">
-            <label>Surface: f(x,y) = x² + y²</label>
+            <span class="field-label">Surface: f(x,y) = x² + y²</span>
             <span class="hint">Fixed paraboloid for demonstration</span>
           </div>
           <div class="field">
-            <label>Point (x₀, y₀)</label>
+            <span class="field-label">Point (x₀, y₀)</span>
             <input bind:value={gradPoint} on:input={run} placeholder="1,2" />
             <span class="hint">Tangent plane is computed here</span>
           </div>
@@ -440,7 +440,7 @@ tangentPlane(surface, {gradPoint.split(',')[0]}, {gradPoint.split(',')[1]});</co
       {#if activeTab === 'trig'}
         <div class="inputs">
           <div class="field">
-            <label>Function</label>
+            <span class="field-label">Function</span>
             <select bind:value={trigFunc} on:change={run}>
               {#each ['sin','cos','tan','arcsin','arccos','arctan','sinh','cosh','tanh','ln','exp','sqrt','abs'] as f}
                 <option value={f}>{f}</option>
@@ -448,11 +448,11 @@ tangentPlane(surface, {gradPoint.split(',')[0]}, {gradPoint.split(',')[1]});</co
             </select>
           </div>
           <div class="field">
-            <label>Variable</label>
+            <span class="field-label">Variable</span>
             <input bind:value={trigArg} on:input={run} maxlength="1" />
           </div>
           <div class="field">
-            <label>Evaluate at {trigArg} =</label>
+            <span class="field-label">Evaluate at {trigArg} =</span>
             <input type="number" step="0.01" bind:value={trigEval} on:input={run} />
           </div>
         </div>
@@ -468,12 +468,12 @@ extendedSlangToLatex(expr); // LaTeX output</code></pre>
       {#if activeTab === 'matrix'}
         <div class="inputs">
           <div class="field wide">
-            <label>Matrix A</label>
+            <span class="field-label">Matrix A</span>
             <textarea bind:value={matrixInput} on:input={run} rows="4" placeholder="4,1,2&#10;1,3,0&#10;2,0,5"></textarea>
             <span class="hint">One row per line, comma-separated values</span>
           </div>
           <div class="field wide">
-            <label>Vector b</label>
+            <span class="field-label">Vector b</span>
             <input bind:value={vectorInput} on:input={run} placeholder="7,8,3" />
           </div>
         </div>
@@ -489,19 +489,19 @@ solve(A, b);</code></pre>
       {#if activeTab === 'ode'}
         <div class="inputs">
           <div class="field">
-            <label>Rate r</label>
+            <span class="field-label">Rate r</span>
             <input type="number" step="0.1" bind:value={odeRate} on:input={run} />
           </div>
           <div class="field">
-            <label>Initial y(0)</label>
+            <span class="field-label">Initial y(0)</span>
             <input type="number" step="0.1" bind:value={odeInitial} on:input={run} />
           </div>
           <div class="field">
-            <label>End time</label>
+            <span class="field-label">End time</span>
             <input type="number" step="0.1" bind:value={odeEnd} on:input={run} />
           </div>
           <div class="field">
-            <label>Step size</label>
+            <span class="field-label">Step size</span>
             <input type="number" step="0.05" bind:value={odeStep} on:input={run} />
           </div>
         </div>
@@ -830,7 +830,7 @@ result.y.at(-1);</code></pre>
 
   .field.wide { flex: 100%; }
 
-  label {
+  .field-label {
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
