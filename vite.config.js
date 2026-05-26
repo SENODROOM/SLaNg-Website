@@ -1,20 +1,13 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
-import fs from 'fs';
-
-const sanitizeSlangmath = {
-  name: 'sanitize-slangmath',
-  enforce: 'pre',
-  load(id) {
-    if (id.includes('/slangmath/') && id.endsWith('.js')) {
-      let code = fs.readFileSync(id, 'utf-8');
-      code = code.replace(/[^\x00-\x7F]/g, ' ');
-      return code;
-    }
-  }
-};
+import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [sanitizeSlangmath, svelte()],
+  plugins: [svelte()],
+  resolve: {
+    alias: {
+      slangmath: resolve('../slang-math.js')
+    }
+  },
   cacheDir: '/tmp/vite-cache'
 });

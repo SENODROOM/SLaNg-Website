@@ -12,7 +12,7 @@
     "vite": "^5.0.0"
   },
   "dependencies": {
-    "slangmath": "^1.1.0"
+    "slangmath": "file:.."
   },
   "type": "module"
 }

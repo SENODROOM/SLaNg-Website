@@ -1,753 +1,507 @@
 <script>
   import { onMount } from 'svelte';
 
-  let activeTab = 'polynomial';
-  let output = '';
-  let latexOutput = '';
-  let error = '';
   let slang;
   let loaded = false;
+  let error = '';
 
-  // Polynomial inputs
-  let polyCoeffs = '1,-3,2';
-  let polyVar = 'x';
-  let polyDiffVar = 'x';
-  let evalX = '2';
+  let expression = 'sin(x) + x^2 / 3';
+  let variable = 'x';
+  let evaluateAt = '2';
+  let operation = 'differentiate';
 
-  // Fraction inputs
-  let fracNumi = '1,0,-1'; // x^2 - 1
-  let fracDeno = '1,-1';   // x - 1
-  let fracDiffVar = 'x';
-  let fracEvalX = '3';
+  let resultLatex = '';
+  let resultValue = '';
+  let resultTree = '';
+  let inputLatex = '';
+  let codeSample = '';
 
-  // LaTeX inputs
-  let latexInput = '\\frac{x^{2} - 1}{x^{2} + 1}';
+  const operations = [
+    { id: 'differentiate', label: 'Differentiate' },
+    { id: 'integrate', label: 'Integrate' },
+    { id: 'simplify', label: 'Simplify' },
+    { id: 'evaluate', label: 'Evaluate' }
+  ];
 
-  // Gradient inputs
-  let gradTerms = 'x2y1'; // x^2 * y
-  let gradPoint = '2,3';
-
-  // Trig inputs
-  let trigFunc = 'sin';
-  let trigArg = 'x';
-  let trigEval = '1.5708';
+  const examples = [
+    { label: 'Power rule', expr: 'x^4 - 3*x^2 + 7', op: 'differentiate', at: '2' },
+    { label: 'Trig chain', expr: 'sin(x^2) + cos(x)', op: 'differentiate', at: '1.57' },
+    { label: 'Quotient', expr: '(x^2 + 1)/(x - 1)', op: 'differentiate', at: '3' },
+    { label: 'Integral', expr: 'x^3 + 2*x', op: 'integrate', at: '2' },
+    { label: 'Numeric eval', expr: 'sqrt(x^2 + 9)', op: 'evaluate', at: '4' }
+  ];
 
   onMount(async () => {
     try {
       slang = await import('slangmath');
       loaded = true;
+      run();
     } catch (e) {
-      error = 'Failed to load slangmath: ' + e.message;
+      error = `Could not load slangmath: ${e.message}`;
     }
   });
 
-  function parseCoeffs(str) {
-    return str.split(',').map(Number);
+  function cleanVariable(value) {
+    const match = value.trim().match(/[a-zA-Z_][a-zA-Z0-9_]*/);
+    return match ? match[0] : 'x';
+  }
+
+  function formatNumber(value) {
+    if (!Number.isFinite(value)) return String(value);
+    const rounded = Math.round(value * 1e8) / 1e8;
+    return String(rounded);
   }
 
   function run() {
     if (!loaded) return;
+
     error = '';
-    output = '';
-    latexOutput = '';
+    resultLatex = '';
+    resultValue = '';
+    resultTree = '';
+    inputLatex = '';
+
     try {
       const {
-        createTerm, createFraction, polynomial,
-        simplifyFraction, evaluateFraction, differentiateFraction,
-        numericalIntegrateFraction, slangToLatex, latexToSlang,
-        gradient, hessian, tangentPlane, findCriticalPoints,
-        createFunction, evaluateFunction, extendedSlangToLatex
+        parseExpr,
+        symDiff,
+        symIntegrate,
+        symSimplify,
+        symEval,
+        symToLatex
       } = slang;
 
-      if (activeTab === 'polynomial') {
-        const coeffs = parseCoeffs(polyCoeffs);
-        const poly = polynomial(coeffs, polyVar);
-        const frac = poly[0][0];
-        const simplified = simplifyFraction(frac);
-        const diff = differentiateFraction(frac, polyDiffVar);
-        const evalResult = evaluateFraction(frac, { [polyVar]: parseFloat(evalX) });
-        const latex = slangToLatex(frac);
-        const diffLatex = slangToLatex(diff);
+      const activeVariable = cleanVariable(variable);
+      const ast = parseExpr(expression);
+      const simplifiedInput = symSimplify(ast);
+      inputLatex = symToLatex(simplifiedInput);
 
-        output = `Polynomial: ${JSON.stringify(simplified.numi.terms, null, 2)}\n\nDerivative terms: ${JSON.stringify(diff.numi.terms, null, 2)}\n\nf(${polyVar}=${evalX}) = ${evalResult}`;
-        latexOutput = `Expression: ${latex}\nDerivative: ${diffLatex}`;
+      let resultAst = simplifiedInput;
+
+      if (operation === 'differentiate') {
+        resultAst = symSimplify(symDiff(ast, activeVariable));
       }
 
-      if (activeTab === 'fraction') {
-        const nTerms = parseCoeffs(fracNumi);
-        const dTerms = parseCoeffs(fracDeno);
-        const makeTerms = (coeffs, v) => {
-          const deg = coeffs.length - 1;
-          return coeffs.map((c, i) => {
-            const p = deg - i;
-            return p === 0 ? createTerm(c) : createTerm(c, { [v]: p });
-          }).filter(t => t.coeff !== 0);
-        };
-        const numi = makeTerms(nTerms, 'x');
-        const deno = makeTerms(dTerms, 'x');
-        const frac = createFraction(numi, deno);
-        const diff = differentiateFraction(frac, fracDiffVar);
-        const evalResult = evaluateFraction(frac, { x: parseFloat(fracEvalX) });
-        const latex = slangToLatex(frac);
-        const diffLatex = slangToLatex(diff);
-
-        output = `Rational Function created.\n\nf(x=${fracEvalX}) = ${evalResult}\n\nNumerator terms: ${JSON.stringify(numi)}\nDenominator terms: ${JSON.stringify(deno)}`;
-        latexOutput = `Expression: ${latex}\nDerivative: ${diffLatex}`;
+      if (operation === 'integrate') {
+        resultAst = symSimplify(symIntegrate(ast, activeVariable));
       }
 
-      if (activeTab === 'latex') {
-        const parsed = latexToSlang(latexInput);
-        const backToLatex = slangToLatex(parsed);
-        output = `Parsed SLaNg object:\n${JSON.stringify(parsed, null, 2)}`;
-        latexOutput = `Re-rendered LaTeX: ${backToLatex}`;
+      if (operation === 'simplify') {
+        resultAst = simplifiedInput;
       }
 
-      if (activeTab === 'calculus') {
-        // f(x,y) = x^2 + y^2
-        const surface = { terms: [createTerm(1, { x: 2 }), createTerm(1, { y: 2 })] };
-        const [x0, y0] = gradPoint.split(',').map(Number);
-        const grad = gradient(surface, ['x', 'y']);
-        const hess = hessian(surface, ['x', 'y']);
-        const tangent = tangentPlane(surface, x0, y0);
-        const critical = findCriticalPoints(surface, ['x', 'y']);
-
-        output = `Surface: f(x,y) = x² + y²\n\nGradient:\n  ∂f/∂x = ${JSON.stringify(grad.x?.terms)}\n  ∂f/∂y = ${JSON.stringify(grad.y?.terms)}\n\nHessian Matrix:\n${JSON.stringify(hess, null, 2)}\n\nTangent Plane at (${x0}, ${y0}):\n  Point: ${JSON.stringify(tangent.point)}\n  Normal: ${JSON.stringify(tangent.normal)}\n\nCritical Points: ${JSON.stringify(critical)}`;
-        latexOutput = `Gradient at (${x0},${y0}): ∇f = (${2*x0}, ${2*y0})`;
+      if (operation === 'evaluate') {
+        const numericValue = Number(evaluateAt);
+        const value = symEval(simplifiedInput, { [activeVariable]: numericValue });
+        resultValue = `f(${activeVariable} = ${evaluateAt}) = ${formatNumber(value)}`;
+      } else {
+        resultLatex = symToLatex(resultAst);
+        const numericValue = Number(evaluateAt);
+        if (Number.isFinite(numericValue)) {
+          try {
+            const value = symEval(resultAst, { [activeVariable]: numericValue });
+            resultValue = `At ${activeVariable} = ${evaluateAt}: ${formatNumber(value)}`;
+          } catch {
+            resultValue = '';
+          }
+        }
       }
 
-      if (activeTab === 'trig') {
-        const { createFunction: cf, evaluateFunction: ef, extendedSlangToLatex: etl } = slang;
-        const expr = cf(trigFunc, [createTerm(1, { [trigArg]: 1 })]);
-        const val = ef(expr, { [trigArg]: parseFloat(trigEval) });
-        const latex = etl(expr);
-        output = `Function: ${trigFunc}(${trigArg})\nAt ${trigArg}=${trigEval}: ${val?.toFixed(6) ?? val}`;
-        latexOutput = `LaTeX: ${latex}`;
-      }
-
+      resultTree = JSON.stringify(resultAst, null, 2);
+      codeSample = buildCodeSample(activeVariable);
     } catch (e) {
       error = e.message;
+      codeSample = buildCodeSample(cleanVariable(variable));
     }
   }
 
-  $: if (loaded && activeTab) run();
+  function buildCodeSample(activeVariable) {
+    const fn =
+      operation === 'differentiate' ? `symSimplify(symDiff(ast, '${activeVariable}'))` :
+      operation === 'integrate' ? `symSimplify(symIntegrate(ast, '${activeVariable}'))` :
+      operation === 'evaluate' ? `symEval(ast, { ${activeVariable}: ${Number(evaluateAt) || 0} })` :
+      'symSimplify(ast)';
 
-  const tabs = [
-    { id: 'polynomial', label: 'Polynomial', icon: '∑' },
-    { id: 'fraction', label: 'Rational', icon: '⅟' },
-    { id: 'latex', label: 'LaTeX ↔', icon: '∫' },
-    { id: 'calculus', label: 'Multivariable', icon: '∇' },
-    { id: 'trig', label: 'Trig Funcs', icon: 'sin' },
-  ];
+    return `import { parseExpr, symDiff, symIntegrate, symSimplify, symEval, symToLatex } from 'slangmath';
 
-  function setTab(t) { activeTab = t; output = ''; latexOutput = ''; error = ''; }
+const ast = parseExpr('${expression.replace(/'/g, "\\'")}');
+const result = ${fn};
+${operation === 'evaluate' ? 'console.log(result);' : 'console.log(symToLatex(result));'}`;
+  }
+
+  function loadExample(example) {
+    expression = example.expr;
+    operation = example.op;
+    evaluateAt = example.at;
+    run();
+  }
+
+  $: if (loaded) run();
 </script>
 
-<!-- head -->
-  <title>SLaNg Math — Live Demo</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-
+<svelte:head>
+  <title>SLaNgMath Live Demo</title>
+  <meta
+    name="description"
+    content="Interactive SLaNgMath playground for symbolic calculus, simplification, evaluation, and LaTeX output."
+  />
+</svelte:head>
 
 <main>
-  <div class="bg-grid"></div>
-
-  <header>
-    <div class="logo-area">
-      <span class="logo-symbol">∫</span>
-      <div>
-        <h1>SLaN<span class="accent">g</span></h1>
-        <p class="tagline">Saad's Language for Analytical Numerics &amp; Geometry</p>
-      </div>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">SLaNgMath</p>
+      <h1>Live symbolic math playground</h1>
     </div>
-    <div class="header-meta">
-      <span class="badge">v1.1.0</span>
-      <span class="badge">Zero Dependencies</span>
-      <span class="badge">Pure JS</span>
+    <div class="status" class:ready={loaded}>
+      {loaded ? 'Library loaded' : 'Loading library'}
     </div>
   </header>
 
-  <section class="hero">
-    <div class="hero-text">
-      <p>A powerful JS library for symbolic &amp; numerical mathematics. Compute derivatives, integrals, gradients, Taylor series, LaTeX conversion, and more — all without a single dependency.</p>
-    </div>
-    <div class="install-box">
-      <span class="install-label">Install</span>
-      <code>npm i slangmath</code>
-    </div>
-  </section>
-
-  <section class="demo-area">
-    <div class="tabs">
-      {#each tabs as t}
-        <button class="tab {activeTab === t.id ? 'active' : ''}" on:click={() => setTab(t.id)}>
-          <span class="tab-icon">{t.icon}</span>
-          {t.label}
-        </button>
-      {/each}
-    </div>
-
-    <div class="panel">
-      {#if !loaded}
-        <div class="loading">
-          <span class="spin">⚙</span> Loading slangmath...
-        </div>
-      {:else}
-
-      <!-- POLYNOMIAL TAB -->
-      {#if activeTab === 'polynomial'}
-        <div class="inputs">
-          <div class="field">
-            <label>Coefficients (highest→lowest degree)</label>
-            <input bind:value={polyCoeffs} on:input={run} placeholder="e.g. 1,-3,2" />
-            <span class="hint">Creates x²−3x+2</span>
-          </div>
-          <div class="field">
-            <label>Variable</label>
-            <input bind:value={polyVar} on:input={run} maxlength="1" />
-          </div>
-          <div class="field">
-            <label>Evaluate at {polyVar} =</label>
-            <input type="number" bind:value={evalX} on:input={run} />
-          </div>
-        </div>
-        <div class="code-hint">
-          <pre><code>import {'{'} polynomial, differentiateFraction, slangToLatex {'}'} from 'slangmath';
-const poly = polynomial([{polyCoeffs}], '{polyVar}');
-const diff = differentiateFraction(poly[0][0], '{polyVar}');
-slangToLatex(diff);</code></pre>
-        </div>
-      {/if}
-
-      <!-- FRACTION TAB -->
-      {#if activeTab === 'fraction'}
-        <div class="inputs">
-          <div class="field">
-            <label>Numerator coefficients</label>
-            <input bind:value={fracNumi} on:input={run} placeholder="1,0,-1" />
-            <span class="hint">e.g. 1,0,-1 → x²−1</span>
-          </div>
-          <div class="field">
-            <label>Denominator coefficients</label>
-            <input bind:value={fracDeno} on:input={run} placeholder="1,-1" />
-            <span class="hint">e.g. 1,-1 → x−1</span>
-          </div>
-          <div class="field">
-            <label>Evaluate at x =</label>
-            <input type="number" bind:value={fracEvalX} on:input={run} />
-          </div>
-        </div>
-        <div class="code-hint">
-          <pre><code>import {'{'} createTerm, createFraction, slangToLatex {'}'} from 'slangmath';
-const frac = createFraction(numeratorTerms, denominatorTerms);
-slangToLatex(frac); // → LaTeX string</code></pre>
-        </div>
-      {/if}
-
-      <!-- LATEX TAB -->
-      {#if activeTab === 'latex'}
-        <div class="inputs">
-          <div class="field wide">
-            <label>LaTeX Expression</label>
-            <input bind:value={latexInput} on:input={run} placeholder="\frac{x^2-1}{x+1}" />
-            <span class="hint">Enter any LaTeX math expression</span>
-          </div>
-        </div>
-        <div class="code-hint">
-          <pre><code>import {'{'} latexToSlang, slangToLatex {'}'} from 'slangmath';
-const slangObj = latexToSlang('{latexInput}');
-slangToLatex(slangObj); // roundtrip</code></pre>
-        </div>
-      {/if}
-
-      <!-- CALCULUS TAB -->
-      {#if activeTab === 'calculus'}
-        <div class="inputs">
-          <div class="field">
-            <label>Surface: f(x,y) = x² + y²</label>
-            <span class="hint">Fixed paraboloid for demonstration</span>
-          </div>
-          <div class="field">
-            <label>Point (x₀, y₀)</label>
-            <input bind:value={gradPoint} on:input={run} placeholder="1,2" />
-            <span class="hint">Tangent plane is computed here</span>
-          </div>
-        </div>
-        <div class="code-hint">
-          <pre><code>import {'{'} gradient, hessian, tangentPlane, findCriticalPoints {'}'} from 'slangmath';
-const surface = {'{'} terms: [createTerm(1,{'{'} x:2 {'}'}), createTerm(1,{'{'} y:2 {'}'})] {'}'};
-gradient(surface, ['x','y']);
-tangentPlane(surface, {gradPoint.split(',')[0]}, {gradPoint.split(',')[1]});</code></pre>
-        </div>
-      {/if}
-
-      <!-- TRIG TAB -->
-      {#if activeTab === 'trig'}
-        <div class="inputs">
-          <div class="field">
-            <label>Function</label>
-            <select bind:value={trigFunc} on:change={run}>
-              {#each ['sin','cos','tan','arcsin','arccos','arctan','sinh','cosh','tanh','ln','exp','sqrt','abs'] as f}
-                <option value={f}>{f}</option>
-              {/each}
-            </select>
-          </div>
-          <div class="field">
-            <label>Variable</label>
-            <input bind:value={trigArg} on:input={run} maxlength="1" />
-          </div>
-          <div class="field">
-            <label>Evaluate at {trigArg} =</label>
-            <input type="number" step="0.01" bind:value={trigEval} on:input={run} />
-          </div>
-        </div>
-        <div class="code-hint">
-          <pre><code>import {'{'} createFunction, evaluateFunction, extendedSlangToLatex {'}'} from 'slangmath';
-const expr = createFunction('{trigFunc}', [createTerm(1, {'{'} {trigArg}: 1 {'}'})]);
-evaluateFunction(expr, {'{'} {trigArg}: {trigEval} {'}'});
-extendedSlangToLatex(expr); // LaTeX output</code></pre>
-        </div>
-      {/if}
-
-      <!-- OUTPUT -->
-      <div class="output-area">
-        {#if error}
-          <div class="error-box">⚠ {error}</div>
-        {:else}
-          <div class="outputs">
-            {#if output}
-              <div class="out-block">
-                <div class="out-label">Output</div>
-                <pre>{output}</pre>
-              </div>
-            {/if}
-            {#if latexOutput}
-              <div class="out-block latex-block">
-                <div class="out-label">LaTeX</div>
-                <pre>{latexOutput}</pre>
-              </div>
-            {/if}
-          </div>
-        {/if}
+  <section class="workspace" aria-label="SLaNgMath live demo">
+    <div class="editor">
+      <div class="field expression-field">
+        <label for="expression">Expression</label>
+        <textarea
+          id="expression"
+          bind:value={expression}
+          on:input={run}
+          spellcheck="false"
+          placeholder="sin(x) + x^2 / 3"
+        />
       </div>
 
+      <div class="controls">
+        <div class="field">
+          <label for="operation">Operation</label>
+          <select id="operation" bind:value={operation} on:change={run}>
+            {#each operations as item}
+              <option value={item.id}>{item.label}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="field small">
+          <label for="variable">Variable</label>
+          <input id="variable" bind:value={variable} on:input={run} />
+        </div>
+
+        <div class="field small">
+          <label for="evaluateAt">Evaluate at</label>
+          <input id="evaluateAt" type="number" step="0.01" bind:value={evaluateAt} on:input={run} />
+        </div>
+      </div>
+
+      <div class="examples" aria-label="Examples">
+        {#each examples as example}
+          <button type="button" on:click={() => loadExample(example)}>{example.label}</button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="results" aria-live="polite">
+      {#if error}
+        <div class="message error">{error}</div>
+      {:else if !loaded}
+        <div class="message">Loading the local slangmath package...</div>
+      {:else}
+        <div class="result-grid">
+          <article>
+            <span>Input LaTeX</span>
+            <pre>{inputLatex}</pre>
+          </article>
+
+          <article>
+            <span>{operation === 'evaluate' ? 'Numeric result' : 'Result LaTeX'}</span>
+            <pre>{operation === 'evaluate' ? resultValue : resultLatex}</pre>
+          </article>
+
+          {#if resultValue && operation !== 'evaluate'}
+            <article>
+              <span>Numeric check</span>
+              <pre>{resultValue}</pre>
+            </article>
+          {/if}
+
+          <article class="wide">
+            <span>Generated code</span>
+            <pre>{codeSample}</pre>
+          </article>
+
+          <article class="wide">
+            <span>SLaNg AST</span>
+            <pre>{resultTree}</pre>
+          </article>
+        </div>
       {/if}
     </div>
   </section>
 
-  <section class="features">
-    <h2>What SLaNg Can Do</h2>
-    <div class="feature-grid">
-      {#each [
-        { icon: '∂', title: 'Symbolic Differentiation', desc: 'Exact symbolic derivatives including quotient rule for rational functions.' },
-        { icon: '∫', title: 'Integration', desc: 'Numerical integration via Simpson\'s rule plus symbolic where possible.' },
-        { icon: '∇', title: 'Multivariable Calculus', desc: 'Gradient, Hessian, tangent planes, directional derivatives, critical points.' },
-        { icon: 'λ', title: 'Lagrange Multipliers', desc: 'Constrained optimization with multiple constraint support.' },
-        { icon: 'TeX', title: 'LaTeX Bidirectional', desc: 'Convert SLaNg expressions to LaTeX and parse LaTeX back into SLaNg.' },
-        { icon: 'sin', title: 'Extended Functions', desc: 'Trig, inverse trig, hyperbolic, logarithmic, and exponential functions.' },
-        { icon: '0', title: 'Zero Dependencies', desc: 'Pure JavaScript. No external libraries. Works anywhere JS runs.' },
-        { icon: 'ℝ', title: 'Polynomial Arithmetic', desc: 'Full polynomial operations: sum, product, GCD simplification.' },
-      ] as f}
-        <div class="feature-card">
-          <span class="f-icon">{f.icon}</span>
-          <h3>{f.title}</h3>
-          <p>{f.desc}</p>
-        </div>
-      {/each}
+  <section class="library-strip">
+    <div>
+      <strong>What this demo is running</strong>
+      <p>Parsing, symbolic differentiation, symbolic integration, simplification, numeric evaluation, and LaTeX rendering all come from the actual local <code>slangmath</code> library.</p>
     </div>
+    <code>npm i slangmath</code>
   </section>
-
-  <footer>
-    <p>SLaNg Math by <strong>Muhammad Saad Amin</strong> · MIT License</p>
-    <p><code>npm i slangmath</code></p>
-  </footer>
 </main>
 
 <style>
-  :global(*, *::before, *::after) { box-sizing: border-box; margin: 0; padding: 0; }
+  :global(*, *::before, *::after) {
+    box-sizing: border-box;
+  }
+
   :global(body) {
-    background: #080c14;
-    color: #e8eaf0;
-    font-family: 'Syne', sans-serif;
+    margin: 0;
     min-height: 100vh;
+    color: #eef2f8;
+    background:
+      linear-gradient(135deg, rgba(6, 95, 70, 0.22), transparent 36%),
+      linear-gradient(225deg, rgba(14, 116, 144, 0.18), transparent 40%),
+      #0b1020;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
   main {
-    max-width: 1100px;
+    width: min(1180px, calc(100vw - 32px));
     margin: 0 auto;
-    padding: 0 24px 80px;
-    position: relative;
+    padding: 28px 0 56px;
   }
 
-  .bg-grid {
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(rgba(56, 189, 248, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  header {
+  .topbar {
     display: flex;
-    align-items: center;
+    align-items: end;
     justify-content: space-between;
-    padding: 40px 0 24px;
-    border-bottom: 1px solid rgba(56,189,248,0.15);
-    position: relative;
-    z-index: 1;
-    flex-wrap: wrap;
-    gap: 16px;
+    gap: 20px;
+    padding: 12px 0 26px;
   }
 
-  .logo-area {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .logo-symbol {
-    font-size: 48px;
-    color: #38bdf8;
-    font-family: 'IBM Plex Mono', monospace;
-    line-height: 1;
+  .eyebrow {
+    margin: 0 0 8px;
+    color: #67e8f9;
+    font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
   }
 
   h1 {
-    font-size: 36px;
-    font-weight: 800;
-    letter-spacing: -1px;
-    color: #f0f4ff;
+    margin: 0;
+    max-width: 760px;
+    font-size: clamp(34px, 7vw, 76px);
+    line-height: 0.95;
+    letter-spacing: 0;
   }
 
-  .accent { color: #38bdf8; }
-
-  .tagline {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    color: #64748b;
-    margin-top: 2px;
+  .status {
+    flex: 0 0 auto;
+    border: 1px solid rgba(248, 113, 113, 0.4);
+    color: #fecaca;
+    background: rgba(127, 29, 29, 0.3);
+    border-radius: 999px;
+    padding: 8px 12px;
+    font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
 
-  .header-meta {
+  .status.ready {
+    border-color: rgba(45, 212, 191, 0.38);
+    color: #99f6e4;
+    background: rgba(15, 118, 110, 0.22);
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .editor,
+  .results,
+  .library-strip {
+    border: 1px solid rgba(226, 232, 240, 0.12);
+    background: rgba(15, 23, 42, 0.72);
+    backdrop-filter: blur(14px);
+    border-radius: 8px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+  }
+
+  .editor {
+    padding: 18px;
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .badge {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    padding: 3px 10px;
-    border: 1px solid rgba(56,189,248,0.3);
-    border-radius: 20px;
-    color: #38bdf8;
-    background: rgba(56,189,248,0.05);
-  }
-
-  .hero {
-    padding: 40px 0 32px;
-    display: flex;
-    align-items: flex-start;
-    gap: 40px;
-    flex-wrap: wrap;
-    position: relative;
-    z-index: 1;
-  }
-
-  .hero-text {
-    flex: 1;
-    min-width: 260px;
-  }
-
-  .hero-text p {
-    font-size: 15px;
-    color: #94a3b8;
-    line-height: 1.7;
-    max-width: 520px;
-  }
-
-  .install-box {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: rgba(56,189,248,0.07);
-    border: 1px solid rgba(56,189,248,0.25);
-    border-radius: 10px;
-    padding: 14px 20px;
-    font-family: 'IBM Plex Mono', monospace;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .install-label {
-    font-size: 11px;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  .install-box code {
-    color: #7dd3fc;
-    font-size: 15px;
-  }
-
-  .demo-area {
-    position: relative;
-    z-index: 1;
-  }
-
-  .tabs {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    margin-bottom: 0;
-    flex-wrap: wrap;
-  }
-
-  .tab {
-    background: none;
-    border: none;
-    color: #64748b;
-    font-family: 'Syne', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 12px 18px;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .tab:hover { color: #94a3b8; }
-
-  .tab.active {
-    color: #38bdf8;
-    border-bottom-color: #38bdf8;
-    background: rgba(56,189,248,0.04);
-  }
-
-  .tab-icon {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 14px;
-    opacity: 0.8;
-  }
-
-  .panel {
-    background: rgba(15, 23, 42, 0.7);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-top: none;
-    border-radius: 0 0 12px 12px;
-    padding: 28px;
-    backdrop-filter: blur(8px);
-  }
-
-  .loading {
-    text-align: center;
-    color: #64748b;
-    padding: 40px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 14px;
-  }
-
-  .spin { display: inline-block; animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  .inputs {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
+    flex-direction: column;
+    gap: 16px;
   }
 
   .field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    flex: 1;
-    min-width: 160px;
+    gap: 7px;
   }
 
-  .field.wide { flex: 100%; }
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 110px 130px;
+    gap: 12px;
+  }
 
-  label {
-    font-size: 11px;
+  label,
+  article span {
+    color: #94a3b8;
+    font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #64748b;
-    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.12em;
   }
 
-  input, select {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 7px;
-    color: #e2e8f0;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 14px;
-    padding: 10px 13px;
-    outline: none;
-    transition: border 0.2s;
+  textarea,
+  input,
+  select {
     width: 100%;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 7px;
+    background: rgba(2, 6, 23, 0.54);
+    color: #f8fafc;
+    font: 500 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    outline: none;
   }
 
-  input:focus, select:focus {
-    border-color: rgba(56,189,248,0.5);
-    background: rgba(56,189,248,0.04);
+  textarea {
+    min-height: 190px;
+    resize: vertical;
+    padding: 14px;
   }
 
-  .hint {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: #475569;
+  input,
+  select {
+    min-height: 44px;
+    padding: 0 12px;
   }
 
-  .code-hint {
-    background: rgba(0,0,0,0.4);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-left: 3px solid #38bdf8;
-    border-radius: 8px;
-    padding: 14px 16px;
-    margin-bottom: 20px;
-    overflow-x: auto;
+  textarea:focus,
+  input:focus,
+  select:focus {
+    border-color: rgba(103, 232, 249, 0.75);
+    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.15);
   }
 
-  .code-hint pre { margin: 0; }
-
-  .code-hint code {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    color: #7dd3fc;
-    line-height: 1.7;
-    white-space: pre;
-  }
-
-  .output-area { margin-top: 4px; }
-
-  .error-box {
-    background: rgba(239,68,68,0.1);
-    border: 1px solid rgba(239,68,68,0.3);
-    color: #fca5a5;
-    padding: 14px 16px;
-    border-radius: 8px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 13px;
-  }
-
-  .outputs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-  }
-
-  @media (max-width: 640px) {
-    .outputs { grid-template-columns: 1fr; }
-  }
-
-  .out-block {
-    background: rgba(0,0,0,0.35);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 8px;
-    padding: 14px 16px;
-    overflow: auto;
-  }
-
-  .latex-block { border-color: rgba(56,189,248,0.2); }
-
-  .out-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1.5px;
-    color: #475569;
-    font-family: 'IBM Plex Mono', monospace;
-    margin-bottom: 10px;
-  }
-
-  .out-block pre {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    color: #a5f3fc;
-    white-space: pre-wrap;
-    word-break: break-all;
-    line-height: 1.6;
-    margin: 0;
-  }
-
-  .features {
-    margin-top: 72px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .features h2 {
-    font-size: 28px;
-    font-weight: 800;
-    color: #f0f4ff;
-    margin-bottom: 32px;
-    letter-spacing: -0.5px;
-  }
-
-  .feature-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
-  }
-
-  .feature-card {
-    background: rgba(15,23,42,0.6);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 12px;
-    padding: 22px;
-    transition: border-color 0.2s, transform 0.2s;
-  }
-
-  .feature-card:hover {
-    border-color: rgba(56,189,248,0.3);
-    transform: translateY(-2px);
-  }
-
-  .f-icon {
-    display: block;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 22px;
-    color: #38bdf8;
-    margin-bottom: 12px;
-  }
-
-  .feature-card h3 {
-    font-size: 14px;
-    font-weight: 700;
-    color: #e2e8f0;
-    margin-bottom: 8px;
-  }
-
-  .feature-card p {
-    font-size: 13px;
-    color: #64748b;
-    line-height: 1.6;
-  }
-
-  footer {
-    margin-top: 80px;
-    padding-top: 24px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    text-align: center;
-    color: #475569;
-    font-size: 13px;
+  .examples {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    position: relative;
-    z-index: 1;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
-  footer strong { color: #94a3b8; }
-  footer code {
-    font-family: 'IBM Plex Mono', monospace;
-    color: #38bdf8;
-    font-size: 12px;
+  button {
+    border: 1px solid rgba(103, 232, 249, 0.24);
+    border-radius: 999px;
+    padding: 8px 11px;
+    background: rgba(8, 145, 178, 0.13);
+    color: #cffafe;
+    font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    cursor: pointer;
+  }
+
+  button:hover {
+    border-color: rgba(103, 232, 249, 0.6);
+    background: rgba(8, 145, 178, 0.22);
+  }
+
+  .results {
+    min-height: 560px;
+    padding: 18px;
+    overflow: hidden;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  article {
+    min-width: 0;
+    border: 1px solid rgba(148, 163, 184, 0.16);
+    border-radius: 7px;
+    background: rgba(2, 6, 23, 0.46);
+    padding: 13px;
+  }
+
+  article.wide {
+    grid-column: 1 / -1;
+  }
+
+  pre {
+    margin: 10px 0 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #a7f3d0;
+    font: 500 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .message {
+    display: grid;
+    min-height: 180px;
+    place-items: center;
+    color: #cbd5e1;
+    text-align: center;
+    font: 700 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .message.error {
+    color: #fecaca;
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    border-radius: 7px;
+    background: rgba(127, 29, 29, 0.26);
+    padding: 18px;
+  }
+
+  .library-strip {
+    margin-top: 16px;
+    padding: 18px;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: center;
+  }
+
+  .library-strip p {
+    margin: 6px 0 0;
+    max-width: 760px;
+    color: #cbd5e1;
+    line-height: 1.6;
+  }
+
+  code {
+    color: #67e8f9;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .library-strip > code {
+    white-space: nowrap;
+    border: 1px solid rgba(103, 232, 249, 0.22);
+    border-radius: 7px;
+    padding: 10px 12px;
+    background: rgba(8, 145, 178, 0.12);
+  }
+
+  @media (max-width: 860px) {
+    main {
+      width: min(100vw - 20px, 680px);
+      padding-top: 18px;
+    }
+
+    .topbar,
+    .library-strip {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .workspace,
+    .result-grid,
+    .controls {
+      grid-template-columns: 1fr;
+    }
+
+    .results {
+      min-height: auto;
+    }
   }
 </style>
